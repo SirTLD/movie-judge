@@ -1,66 +1,46 @@
-// pages/index.js
-import { useState, useEffect } from 'react'
-import Head from 'next/head'
-import Header from '../components/Header'
-import MovieGrid from '../components/MovieGrid'
+// app/page.tsx or app/home/page.tsx
+'use client'
 
-const API_URL = process.env.API_URL
-const SEARCH_API = process.env.SEARCH_API
+import Header from '@/components/Header'
+import MovieGrid from '@/components/MovieGrid'
+import { useEffect, useState } from 'react'
+import { fetchMovies, Movie } from '@/lib/tmdb'
+import { useDebounce } from '@/hooks/useDenounce'
 
 export default function Home() {
-  const [movies, setMovies] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [searchTerm, setSearchTerm] = useState('')
+  const debouncedSearch = useDebounce(searchTerm, 500)
+
+  const [movies, setMovies] = useState<Movie[]>([])
+  const [loading, setLoading] = useState<boolean>(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    getMovies(API_URL)
-  }, [])
+    loadMovies(debouncedSearch)
+  }, [debouncedSearch])
 
-  async function getMovies(url) {
+  async function loadMovies(search?: string) {
     try {
       setLoading(true)
-      const res = await fetch(url)
-      const data = await res.json()
-      setMovies(data.results)
-    } catch (error) {
-      console.error('Error fetching movies:', error)
+      setError(null)
+      const results = await fetchMovies(search)
+      setMovies(results)
+    } catch (err) {
+      setError(err as string)
+      setMovies([])
     } finally {
       setLoading(false)
     }
   }
 
-  const handleSearch = (searchTerm) => {
-    if (searchTerm && searchTerm !== '') {
-      getMovies(SEARCH_API + searchTerm)
-    } else {
-      getMovies(API_URL)
-    }
-  }
-
   return (
-    <>
-      <Head>
-        <title>Film Judge</title>
-        <meta name='description' content='Movie rating and discovery app' />
-        <meta name='viewport' content='width=device-width, initial-scale=1' />
-        <link rel='icon' href='/favicon.ico' />
-        <link
-          rel='stylesheet'
-          href='https://use.fontawesome.com/releases/v5.15.3/css/all.css'
-          integrity='sha384-SZXxX4whJ79/gErwcOYf+zWLeJdY/qpuqC4cAa9rOGUstPomtqpuNWT9wdPEn2fk'
-          crossOrigin='anonymous'
-        />
-      </Head>
-
-      <div className='wrapper-container'>
-        <Header onSearch={handleSearch} />
-        <main id='main'>
-          {loading ? (
-            <div className='loading'>Loading...</div>
-          ) : (
-            <MovieGrid movies={movies} />
-          )}
-        </main>
-      </div>
-    </>
+    <div className='wrapper-container'>
+      <Header onSearchChange={setSearchTerm} />
+      <main id='main'>
+        {loading && <div className='loading'>Loading...</div>}
+        {!loading && error && <div className='error'>{error}</div>}
+        {!loading && !error && <MovieGrid movies={movies} />}
+      </main>
+    </div>
   )
 }
